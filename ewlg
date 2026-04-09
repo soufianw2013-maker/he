@@ -1,4 +1,4 @@
-
+ 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -981,4 +981,3 @@ makeSection(FeatFrame,"  COMBAT",1)
 makeToggle(FeatFrame,"Bat Aimbot",2,function(v)
     if v then
         if aplOn then stopAutoPlayLeft() updateToggle("Auto Play Left",false) end
-   ... (23 KB left)
