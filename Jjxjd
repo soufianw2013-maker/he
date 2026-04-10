@@ -1,0 +1,120 @@
+
+local Players  = game:GetService("Players")
+local UIS      = game:GetService("UserInputService")
+local RS       = game:GetService("RunService")
+local TS       = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+
+local me   = Players.LocalPlayer
+local pgui = me:WaitForChild("PlayerGui")
+
+local cfg = {
+    NormalSpeed       = 60,
+    CarrySpeed        = 30,
+    FloatHeight       = 8,
+    DodgeHeight       = 7,
+    StealRadius       = 7,
+    BatRadius         = 20,
+    HardHitRadius     = 10,
+    SpinSpeed         = 19,
+    GravityPercent    = 70,
+    HopPower          = 35,
+    JumpPower         = 50,
+
+    SpeedKey          = Enum.KeyCode.Q,
+
+    AutoPlayLeft      = false,
+    AutoPlayRight     = false,
+    AutoSteal         = true,
+    AutoBat           = true,
+    BatAimbot         = false,
+    AntiRagdoll       = true,
+    InfiniteJump      = false,
+    Float             = false,
+    Dodge             = false,
+    SpinBot           = false,
+    Unwalk            = true,
+    Optimizer         = false,
+    PlayerESP         = true,
+    LockUI            = false,
+    MobileMode        = false,
+    HardHit           = true,
+    LowGravity        = false,
+    FloatPlayL        = false,
+    FloatPlayR        = false,
+    AutoLeft          = false,
+    AutoRight         = false,
+    AutoTpLeft        = false,
+    AutoTpRight       = false,
+}
+
+
+local T = {
+    BG           = Color3.fromRGB(5, 5, 5),
+    Surface      = Color3.fromRGB(10, 10, 10),
+    Card         = Color3.fromRGB(20, 20, 20),
+    CardHover    = Color3.fromRGB(35, 0, 0),
+    Input        = Color3.fromRGB(15, 15, 15),
+    Separator    = Color3.fromRGB(40, 0, 0),
+    Border       = Color3.fromRGB(120, 0, 0),
+    BorderHi     = Color3.fromRGB(255, 0, 0),
+    Accent       = Color3.fromRGB(200, 0, 0),
+    AccentMid    = Color3.fromRGB(220, 0, 0),
+    AccentSoft   = Color3.fromRGB(255, 60, 60),
+    AccentBright = Color3.fromRGB(255, 120, 120),
+    Text         = Color3.fromRGB(255, 255, 255),
+    TextSub      = Color3.fromRGB(200, 200, 200),
+    TextMuted    = Color3.fromRGB(150, 150, 150),
+    TrkOff       = Color3.fromRGB(30, 0, 0),
+    TrkOn        = Color3.fromRGB(255, 0, 0),
+    KnobOff      = Color3.fromRGB(120, 120, 120),
+    KnobOn       = Color3.fromRGB(255, 0, 0),
+    PrgBG        = Color3.fromRGB(20, 0, 0),
+    PrgFill      = Color3.fromRGB(255, 0, 0),
+    ErrRed       = Color3.fromRGB(255, 0, 0),
+    Green        = Color3.fromRGB(0, 255, 100)
+}
+
+local L1     = Vector3.new(-476.48, -6.28,  92.73)
+local LEND   = Vector3.new(-483.12, -4.95,  94.80)
+local LFINAL = Vector3.new(-473.38, -8.40,  22.34)
+local R1     = Vector3.new(-476.16, -6.52,  25.62)
+local REND   = Vector3.new(-483.04, -5.09,  23.14)
+local RFINAL = Vector3.new(-476.17, -7.91,  97.91)
+local FSPD, RSPD = 59, 30
+
+-- doc 3 TP coords (exact)
+local TP_A  = Vector3.new(-472.60, -7.00,  57.52)
+local TP_B1 = Vector3.new(-472.65, -7.00,  95.69)
+local TP_B2 = Vector3.new(-471.76, -7.00,  26.22)
+local TP_F1 = Vector3.new(-483.59, -5.04, 104.24)
+local TP_F2 = Vector3.new(-483.51, -5.10,  18.89)
+
+
+
+local vHum, vRoot
+local function bindChar(char)
+    vHum  = char:WaitForChild("Humanoid")
+    vRoot = char:WaitForChild("HumanoidRootPart")
+end
+if me.Character then bindChar(me.Character) end
+me.CharacterAdded:Connect(bindChar)
+
+local function getHRP() local c=me.Character; return c and c:FindFirstChild("HumanoidRootPart") end
+local function getHum() local c=me.Character; return c and c:FindFirstChildOfClass("Humanoid") end
+
+
+local speedToggled = false
+
+UIS.InputBegan:Connect(function(inp, gameProcessed)
+    if gameProcessed then return end
+    if inp.UserInputType == Enum.UserInputType.Keyboard
+        and inp.KeyCode == cfg.SpeedKey then
+        speedToggled = not speedToggled
+    end
+end)
+
+RS.Heartbeat:Connect(function()
+    if not vHum or not vRoot then return end
+    local spd = speedToggled and cfg.NormalSpeed or cfg.CarrySpeed
+    local md  = vHum.MoveDirection
