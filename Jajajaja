@@ -1,0 +1,471 @@
+task.spawn(function()
+    _G.VOIDxHUB = {}
+    local C = _G.VOIDxHUB
+
+    -- Services
+    C.Players = game:GetService("Players")
+    C.RunService = game:GetService("RunService")
+    C.UserInputService = game:GetService("UserInputService")
+    C.TweenService = game:GetService("TweenService")
+    C.SoundService = game:GetService("SoundService")
+    C.Lighting = game:GetService("Lighting")
+    C.ReplicatedStorage = game:GetService("ReplicatedStorage")
+    C.HttpService = game:GetService("HttpService")
+    C.Player = C.Players.LocalPlayer
+
+    C.isMobile = C.UserInputService.TouchEnabled and not C.UserInputService.KeyboardEnabled
+    C.s = C.isMobile and 0.65 or 1
+    C.dragLocked = false
+    C.CurrentBgEffect = "Stars"
+    C.bgEffects = {"Stars", "Matrix", "Grid", "Pulse", "Circles", "None"}
+    C.CurrentBgEffectIndex = 1
+
+    function C.waitForCharacter()
+        local char = C.Player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
+            return char
+        end
+        return C.Player.CharacterAdded:Wait()
+    end
+    task.spawn(function() C.waitForCharacter() end)
+
+    function C.MakeDraggable(frame)
+        local dragging, dragInput, dragStart, startPos
+        local function update(input)
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+        frame.InputBegan:Connect(function(input)
+            if C.dragLocked then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = frame.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                end)
+            end
+        end)
+        frame.InputChanged:Connect(function(input)
+            if C.dragLocked then return end
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        C.UserInputService.InputChanged:Connect(function(input)
+            if C.dragLocked then return end
+            if input == dragInput and dragging then update(input) end
+        end)
+    end
+
+    -- Config
+    C.ConfigFileName = "VOID_HUB_Config_V1.json"
+    C.Enabled = {
+        SpeedBoost = false, AntiRagdoll = false, SpinBot = false,
+        SpeedWhileStealing = false, AutoSteal = false, Unwalk = false,
+        Optimizer = false, Galaxy = false, SpamBat = false, BatAimbot = false,
+        GalaxySkyBright = false, AutoWalkEnabled = false, AutoRightEnabled = false,
+        AutoPlayLeftEnabled = false, AutoPlayRightEnabled = false, InfJump = false,
+        ESP = false, Hover = false, Stats = false, SpeedMeter = false, TPDown = false
+    }
+    C.Values = {
+        BoostSpeed = 30, SpinSpeed = 30, StealingSpeedValue = 29,
+        STEAL_RADIUS = 20, STEAL_DURATION = 1.3,
+        AutoLeftSpeed = 59.5, AutoRightSpeed = 59.5,
+        AutoWalkReturnSpeed = 30, AutoPlayReturnSpeed = 30,
+        AutoWalkWaitTime = 1.0, AutoPlayWaitTime = 1.0,
+        AutoPlayExitDist = 6.0, DEFAULT_GRAVITY = 196.2,
+        GalaxyGravityPercent = 70, HOP_POWER = 35, HOP_COOLDOWN = 0.08,
+        FOV = 105.8, HoverHeight = 6
+    }
+
+    C.KEYBINDS = {
+        SPEED = Enum.KeyCode.V, SPIN = Enum.KeyCode.N, GALAXY = Enum.KeyCode.M,
+        BATAIMBOT = Enum.KeyCode.X, NUKE = Enum.KeyCode.Q,
+        AUTOLEFT = Enum.KeyCode.Z, AUTORIGHT = Enum.KeyCode.C,
+        AUTOPLAYLEFT = Enum.KeyCode.F10, AUTOPLAYRIGHT = Enum.KeyCode.F11,
+        ANTIRAGDOLL = Enum.KeyCode.F1, SPEEDSTEAL = Enum.KeyCode.F2,
+        AUTOSTEAL = Enum.KeyCode.F3, UNWALK = Enum.KeyCode.F4,
+        OPTIMIZER = Enum.KeyCode.F5, SPAMBAT = Enum.KeyCode.F6,
+        GALAXY_SKY = Enum.KeyCode.F7, INFJUMP = Enum.KeyCode.F8,
+        ESP = Enum.KeyCode.P, HOVER = Enum.KeyCode.G,
+        STATS = Enum.KeyCode.F9, SPEEDMETER = Enum.KeyCode.J,
+        TPDOWN = Enum.KeyCode.G,
+        MOBILE_HOVER = Enum.KeyCode.LeftShift, MOBILE_BAT = Enum.KeyCode.B,
+        MOBILE_PLAYL = Enum.KeyCode.LeftAlt, MOBILE_PLAYR = Enum.KeyCode.RightAlt,
+        MOBILE_TPDOWN = Enum.KeyCode.T, MOBILE_DROP = Enum.KeyCode.D
+    }
+    C.GAMEPAD_BINDS = {
+        MOBILE_HOVER = Enum.KeyCode.ButtonX, MOBILE_BAT = Enum.KeyCode.ButtonY,
+        MOBILE_PLAYL = Enum.KeyCode.ButtonL1, MOBILE_PLAYR = Enum.KeyCode.ButtonR1,
+        MOBILE_TPDOWN = Enum.KeyCode.ButtonL2, MOBILE_DROP = Enum.KeyCode.ButtonR2
+    }
+
+    C.CurrentThemeIndex = 1
+    C.isRainbow = false
+
+    pcall(function()
+        if readfile and isfile and isfile(C.ConfigFileName) then
+            local data = C.HttpService:JSONDecode(readfile(C.ConfigFileName))
+            if data then
+                for k, v in pairs(data) do
+                    if C.Enabled[k] ~= nil then C.Enabled[k] = v end
+                end
+                for k, v in pairs(data) do
+                    if C.Values[k] ~= nil then C.Values[k] = v end
+                end
+                for key, codeName in pairs(data) do
+                    if key:match("^KEY_") then
+                        local kbind = key:gsub("KEY_", "")
+                        if C.KEYBINDS[kbind] then
+                            C.KEYBINDS[kbind] = Enum.KeyCode[codeName]
+                        end
+                    end
+                    if key:match("^GAMEPAD_") then
+                        local kbind = key:gsub("GAMEPAD_", "")
+                        if C.GAMEPAD_BINDS[kbind] then
+                            C.GAMEPAD_BINDS[kbind] = Enum.KeyCode[codeName]
+                        end
+                    end
+                end
+                if data.CurrentThemeIndex then C.CurrentThemeIndex = data.CurrentThemeIndex end
+                if data.isRainbow ~= nil then C.isRainbow = data.isRainbow end
+                if data.CurrentBgEffectIndex then C.CurrentBgEffectIndex = data.CurrentBgEffectIndex end
+            end
+        end
+    end)
+
+    function C.SaveConfig()
+        local data = {}
+        for k, v in pairs(C.Enabled) do data[k] = v end
+        for k, v in pairs(C.Values) do data[k] = v end
+        for k, v in pairs(C.KEYBINDS) do data["KEY_"..k] = v.Name end
+        for k, v in pairs(C.GAMEPAD_BINDS) do data["GAMEPAD_"..k] = v.Name end
+        data.CurrentThemeIndex = C.CurrentThemeIndex
+        data.isRainbow = C.isRainbow
+        data.CurrentBgEffectIndex = C.CurrentBgEffectIndex
+        local success = false
+        if writefile then
+            pcall(function()
+                writefile(C.ConfigFileName, C.HttpService:JSONEncode(data))
+                success = true
+            end)
+        end
+        return success
+    end
+
+    -- Internal tables
+    C.Connections = {}
+    C.StealData = {}
+    C.SavedAnimations = {}
+    C.EspConnections = {}
+    C.WfConns = {}
+    C.WfActive = false
+    C.OriginalTransparency = {}
+    C.XrayEnabled = false
+    C.GalaxyPlanets = {}
+    C.MobileShortcutButtons = {}
+    C.VisualSetters = {}
+    C.SliderSetters = {}
+    C.KeyButtons = {}
+    C.WaitingForKeybind = nil
+    C.GuiVisible = true
+    C.ThemeUpdateFuncs = {}
+    C.SpinBAV = nil
+    C.AimbotConnection = nil
+    C.LockedTarget = nil
+    C.AimbotHighlight = nil
+    C.GalaxyVectorForce = nil
+    C.GalaxyAttachment = nil
+    C.GalaxyEnabled = false
+    C.HopsEnabled = false
+    C.LastHopTime = 0
+    C.SpaceHeld = false
+    C.OriginalJumpPower = 50
+    C.AutoWalkPhase = 1
+    C.AutoRightPhase = 1
+    C.AutoPlayLeftPhase = 1
+    C.AutoPlayRightPhase = 1
+    C.AutoWalkEnabled = false
+    C.AutoRightEnabled = false
+    C.AutoPlayLeftEnabled = false
+    C.AutoPlayRightEnabled = false
+    C.AutoWalkConnection = nil
+    C.AutoRightConnection = nil
+    C.AutoPlayLeftConnection = nil
+    C.AutoPlayRightConnection = nil
+    C.AutoPlayLeftWait = false
+    C.AutoPlayLeftWaitStart = 0
+    C.AutoPlayRightWait = false
+    C.AutoPlayRightWaitStart = 0
+    C.OriginalSkybox = nil
+    C.GalaxySkyBright = nil
+    C.GalaxySkyBrightConn = nil
+    C.GalaxyBloom = nil
+    C.GalaxyCC = nil
+    C.FovConnection = nil
+    C.SpeedMeterConnection = nil
+    C.SpeedMeterGui = nil
+    C.AutoStealGui = nil
+    C.BarFill = nil
+    C.RadiusValueLabel = nil
+    C.DurationValueLabel = nil
+    C.IsStealing = false
+    C.StealProgress = 0
+    C.LastBatSwing = 0
+    C.BatSwingCooldown = 0.12
+    C.SlapList = {
+        {1,"Bat"},{2,"Slap"},{3,"Iron Slap"},{4,"Gold Slap"},
+        {5,"Diamond Slap"},{6,"Emerald Slap"},{7,"Ruby Slap"},
+        {8,"Dark Matter Slap"},{9,"Flame Slap"},{10,"Nuclear Slap"},
+        {11,"Galaxy Slap"},{12,"Glitched Slap"}
+    }
+    C.ADMIN_KEY = "78a772b6-9e1c-4827-ab8b-04a07838f298"
+    C.REMOTE_EVENT_ID = "352aad58-c786-4998-886b-3e4fa390721e"
+    C.BALLOON_REMOTE = C.ReplicatedStorage:FindFirstChild(C.REMOTE_EVENT_ID, true)
+    C.HoverTargetY = 0
+    C.AIMBOT_SPEED = 60
+    C.MELEE_OFFSET = 3
+    C.MAX_DISTANCE = math.huge
+
+    -- Colors
+    C.Themes = {
+        ["Royal Purple"] = { P = Color3.fromRGB(138, 43, 226), L = Color3.fromRGB(170, 80, 255), D = Color3.fromRGB(90, 20, 150) },
+        ["Crimson Red"] = { P = Color3.fromRGB(220, 20, 60), L = Color3.fromRGB(255, 60, 90), D = Color3.fromRGB(150, 15, 40) },
+        ["Cyberpunk Yellow"] = { P = Color3.fromRGB(255, 215, 0), L = Color3.fromRGB(255, 235, 100), D = Color3.fromRGB(180, 150, 0) },
+        ["Neon Green"] = { P = Color3.fromRGB(50, 255, 50), L = Color3.fromRGB(100, 255, 100), D = Color3.fromRGB(20, 180, 20) }
+    }
+    C.ThemeNames = {"Royal Purple", "Crimson Red", "Cyberpunk Yellow", "Neon Green", "Rainbow Mode"}
+    C.Color = {
+        bg = Color3.fromRGB(12,12,15),
+        sidebar = Color3.fromRGB(18,18,22),
+        primary = C.Themes["Royal Purple"].P,
+        primaryLight = C.Themes["Royal Purple"].L,
+        primaryDark = C.Themes["Royal Purple"].D,
+        text = Color3.fromRGB(245,245,245),
+        textMuted = Color3.fromRGB(130,130,140),
+        elementBg = Color3.fromRGB(24,24,28),
+        border = Color3.fromRGB(40,40,48),
+        success = Color3.fromRGB(40,200,100)
+    }
+
+    function C.UpdateThemeColors(p, l, d)
+        C.Color.primary = p
+        C.Color.primaryLight = l
+        C.Color.primaryDark = d
+        for _, func in ipairs(C.ThemeUpdateFuncs) do
+            func(p, l, d)
+        end
+    end
+
+    C.RunService.RenderStepped:Connect(function()
+        if C.isRainbow then
+            local hue = tick() % 5 / 5
+            local rgb = Color3.fromHSV(hue, 1, 1)
+            local light = Color3.fromHSV(hue, 0.6, 1)
+            local dark = Color3.fromHSV(hue, 1, 0.5)
+            C.UpdateThemeColors(rgb, light, dark)
+        end
+    end)
+
+    -- ====================== FEATURE FUNCTIONS ======================
+    function C.INSTANT_NUKE(target)
+        if not C.BALLOON_REMOTE or not target then return end
+        for _, p in ipairs({"balloon","ragdoll","jumpscare","morph","tiny","rocket","inverse","jail"}) do
+            C.BALLOON_REMOTE:FireServer(C.ADMIN_KEY, target, p)
+        end
+    end
+
+    function C.getNearestPlayer()
+        local c = C.Player.Character
+        if not c then return nil end
+        local h = c:FindFirstChild("HumanoidRootPart")
+        if not h then return nil end
+        local pos = h.Position
+        local nearest, dist = nil, math.huge
+        for _, p in ipairs(C.Players:GetPlayers()) do
+            if p ~= C.Player and p.Character then
+                local oh = p.Character:FindFirstChild("HumanoidRootPart")
+                if oh then
+                    local d = (pos - oh.Position).Magnitude
+                    if d < dist then
+                        dist = d
+                        nearest = p
+                    end
+                end
+            end
+        end
+        return nearest
+    end
+
+    function C.findBat()
+        local c = C.Player.Character
+        if not c then return nil end
+        local bp = C.Player:FindFirstChildOfClass("Backpack")
+        for _, ch in ipairs(c:GetChildren()) do
+            if ch:IsA("Tool") and ch.Name:lower():find("bat") then return ch end
+        end
+        if bp then
+            for _, ch in ipairs(bp:GetChildren()) do
+                if ch:IsA("Tool") and ch.Name:lower():find("bat") then return ch end
+            end
+        end
+        for _, i in ipairs(C.SlapList) do
+            local t = c:FindFirstChild(i[2]) or (bp and bp:FindFirstChild(i[2]))
+            if t then return t end
+        end
+        return nil
+    end
+
+    function C.startSpamBat()
+        if C.Connections.spamBat then return end
+        C.Connections.spamBat = C.RunService.Heartbeat:Connect(function()
+            if not C.Enabled.SpamBat then return end
+            local c = C.Player.Character
+            if not c then return end
+            local bat = C.findBat()
+            if not bat then return end
+            if bat.Parent ~= c then bat.Parent = c end
+            local now = tick()
+            if now - C.LastBatSwing < C.BatSwingCooldown then return end
+            C.LastBatSwing = now
+            pcall(function() bat:Activate() end)
+        end)
+    end
+    function C.stopSpamBat()
+        if C.Connections.spamBat then C.Connections.spamBat:Disconnect() C.Connections.spamBat = nil end
+    end
+
+    function C.startSpinBot()
+        local c = C.Player.Character
+        if not c then return end
+        local hrp = c:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        if C.SpinBAV then C.SpinBAV:Destroy() end
+        for _, v in pairs(hrp:GetChildren()) do if v.Name == "SpinBAV" then v:Destroy() end end
+        C.SpinBAV = Instance.new("BodyAngularVelocity")
+        C.SpinBAV.Name = "SpinBAV"
+        C.SpinBAV.MaxTorque = Vector3.new(0, math.huge, 0)
+        C.SpinBAV.AngularVelocity = Vector3.new(0, C.Values.SpinSpeed, 0)
+        C.SpinBAV.Parent = hrp
+    end
+    function C.stopSpinBot()
+        if C.SpinBAV then C.SpinBAV:Destroy() C.SpinBAV = nil end
+        local c = C.Player.Character
+        if c then
+            local hrp = c:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for _, v in pairs(hrp:GetChildren()) do if v.Name == "SpinBAV" then v:Destroy() end end
+            end
+        end
+    end
+
+    C.RunService.Heartbeat:Connect(function()
+        if C.Enabled.SpinBot and C.SpinBAV then
+            if C.Player:GetAttribute("Stealing") then
+                C.SpinBAV.AngularVelocity = Vector3.new(0,0,0)
+            else
+                C.SpinBAV.AngularVelocity = Vector3.new(0, C.Values.SpinSpeed, 0)
+            end
+        end
+    end)
+
+    function C.toggleSpeedMeter(state)
+        if C.SpeedMeterConnection then C.SpeedMeterConnection:Disconnect() C.SpeedMeterConnection = nil end
+        if C.SpeedMeterGui then C.SpeedMeterGui:Destroy() C.SpeedMeterGui = nil end
+        if not state then return end
+        local char = C.Player.Character
+        if not char then return end
+        local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+        if not head then return end
+        C.SpeedMeterGui = Instance.new("BillboardGui")
+        C.SpeedMeterGui.Name = "CashHubSpeedMeter"
+        C.SpeedMeterGui.Adornee = head
+        C.SpeedMeterGui.Size = UDim2.new(0,150,0,40)
+        C.SpeedMeterGui.StudsOffset = Vector3.new(0,3.5,0)
+        C.SpeedMeterGui.AlwaysOnTop = true
+        local textLabel = Instance.new("TextLabel", C.SpeedMeterGui)
+        textLabel.Name = "SpeedText"
+        textLabel.Size = UDim2.new(1,0,1,0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Text = "Speed: 0"
+        textLabel.TextColor3 = Color3.fromRGB(255,255,255)
+        textLabel.TextStrokeTransparency = 0
+        textLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+        textLabel.Font = Enum.Font.GothamBold
+        textLabel.TextSize = 16 * C.s
+        local successHl, _ = pcall(function() C.SpeedMeterGui.Parent = game:GetService("CoreGui") end)
+        if not successHl then C.SpeedMeterGui.Parent = C.Player:WaitForChild("PlayerGui") end
+        C.SpeedMeterConnection = C.RunService.Heartbeat:Connect(function()
+            if not C.Player.Character or not C.Player.Character:FindFirstChild("HumanoidRootPart") then return end
+            local hrp = C.Player.Character.HumanoidRootPart
+            if C.SpeedMeterGui and C.SpeedMeterGui:FindFirstChild("SpeedText") then
+                local hv = Vector3.new(hrp.AssemblyLinearVelocity.X, 0, hrp.AssemblyLinearVelocity.Z)
+                local speed = math.round(hv.Magnitude)
+                C.SpeedMeterGui.SpeedText.Text = "Speed: " .. tostring(speed)
+            end
+        end)
+    end
+
+    C.AimbotHighlight = Instance.new("Highlight")
+    C.AimbotHighlight.Name = "AimbotTargetESP"
+    C.AimbotHighlight.FillColor = Color3.fromRGB(255,0,0)
+    C.AimbotHighlight.OutlineColor = Color3.fromRGB(255,255,255)
+    C.AimbotHighlight.FillTransparency = 0.5
+    C.AimbotHighlight.OutlineTransparency = 0
+    local successHl, _ = pcall(function() C.AimbotHighlight.Parent = game:GetService("CoreGui") end)
+    if not successHl then C.AimbotHighlight.Parent = C.Player:WaitForChild("PlayerGui") end
+
+    function C.isTargetValid(targetChar)
+        if not targetChar then return false end
+        local hum = targetChar:FindFirstChildOfClass("Humanoid")
+        local hrp = targetChar:FindFirstChild("HumanoidRootPart")
+        local ff = targetChar:FindFirstChildOfClass("ForceField")
+        return hum and hrp and hum.Health > 0 and not ff
+    end
+
+    function C.getBestTarget(myHRP)
+        if C.LockedTarget and C.isTargetValid(C.LockedTarget) then
+            return C.LockedTarget:FindFirstChild("HumanoidRootPart"), C.LockedTarget
+        end
+        local shortestDistance = C.MAX_DISTANCE
+        local newTargetChar, newTargetHRP = nil, nil
+        for _, targetPlayer in ipairs(C.Players:GetPlayers()) do
+            if targetPlayer ~= C.Player and C.isTargetValid(targetPlayer.Character) then
+                local targetHRP = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local distance = (targetHRP.Position - myHRP.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    newTargetHRP = targetHRP
+                    newTargetChar = targetPlayer.Character
+                end
+            end
+        end
+        C.LockedTarget = newTargetChar
+        return newTargetHRP, newTargetChar
+    end
+
+    function C.startBatAimbot()
+        if C.AimbotConnection then return end
+        local c = C.Player.Character
+        if not c then return end
+        local h = c:FindFirstChild("HumanoidRootPart")
+        local hum = c:FindFirstChildOfClass("Humanoid")
+        if not h or not hum then return end
+        hum.AutoRotate = false
+        local attachment = h:FindFirstChild("AimbotAttachment") or Instance.new("Attachment", h)
+        attachment.Name = "AimbotAttachment"
+        local align = h:FindFirstChild("AimbotAlign") or Instance.new("AlignOrientation", h)
+        align.Name = "AimbotAlign"
+        align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+        align.Attachment0 = attachment
+        align.MaxTorque = math.huge
+        align.Responsiveness = 200
+        C.AimbotConnection = C.RunService.Heartbeat:Connect(function(dt)
+            if not C.Enabled.BatAimbot then return end
+            if not C.Player.Character or not C.Player.Character:FindFirstChild("HumanoidRootPart") then return end
+            local currentHRP = C.Player.Character.HumanoidRootPart
+            local currentHum = C.Player.Character:FindFirstChildOfClass("Humanoid")
+            local bat = C.findBat()
+            if bat and bat.Parent ~= C.Player.Character then currentHum:EquipTool(bat) end
+            local targetHRP, targetChar = C.getBestTarget(cur
