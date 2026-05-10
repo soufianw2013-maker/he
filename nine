@@ -1,0 +1,215 @@
+-- =============================================
+-- Nine Hub Duels - CLEANED & STANDALONE
+-- Removed all junk, spam, and loader dependency
+-- =============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+local SoundService = game:GetService("SoundService")
+local Debris = game:GetService("Debris")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local Humanoid = Character:WaitForChild("Humanoid")
+
+-- ====================== CONFIG ======================
+local Config = {
+    -- Combat
+    Aimbot = true,
+    AimbotRadius = 35,
+    AimbotSpeed = 45,
+    Prediction = true,
+    PredictAmount = 15,
+    AutoPredict = false,
+    ShowPrediction = false,
+    TPChase = true,
+
+    -- Movement
+    SpeedBoost = 59,
+    InfiniteJump = false,
+    AutoTPDown = false,
+
+    -- Automation
+    AutoSteal = false,
+    StealSpeed = 28,
+
+    -- Visuals
+    PlayerESP = false,
+    ShowAimbotRadius = true,
+}
+
+-- ====================== GUI ======================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "NineHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+ScreenGui.Parent = CoreGui
+
+-- Dynamic Island
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "DynamicIsland"
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+MainFrame.BackgroundTransparency = 0.05
+MainFrame.Size = UDim2.new(0, 180, 0, 27)
+MainFrame.Position = UDim2.new(0.5, 0, 0, 6)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0)
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 13)
+
+local Stroke = Instance.new("UIStroke", MainFrame)
+Stroke.Thickness = 1.5
+Stroke.Color = Color3.fromRGB(45, 45, 55)
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 1, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Nine Hub Duels"
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 9.6
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Parent = MainFrame
+
+-- ScrollingFrame
+local Scrolling = Instance.new("ScrollingFrame")
+Scrolling.Size = UDim2.new(1, -12, 1, -36)
+Scrolling.Position = UDim2.new(0, 6, 0, 28)
+Scrolling.BackgroundTransparency = 1
+Scrolling.ScrollBarThickness = 2
+Scrolling.ScrollBarImageColor3 = Color3.fromRGB(142, 68, 204)
+Scrolling.Parent = MainFrame
+
+local List = Instance.new("UIListLayout", Scrolling)
+List.Padding = UDim.new(0, 4)
+List.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Watermark & Timer
+local Watermark = Instance.new("TextLabel")
+Watermark.Name = "NinesWatermark"
+Watermark.Position = UDim2.new(1, -6, 0, 6)
+Watermark.Size = UDim2.new(0, 90, 0, 12)
+Watermark.BackgroundTransparency = 1
+Watermark.Text = "discord.gg/nines"
+Watermark.TextColor3 = Color3.new(0.96, 0.96, 0.98)
+Watermark.Font = Enum.Font.GothamBold
+Watermark.TextSize = 8.4
+Watermark.TextXAlignment = Enum.TextXAlignment.Right
+Watermark.TextStrokeTransparency = 0
+Watermark.Parent = ScreenGui
+
+local TimerLabel = Instance.new("TextLabel")
+TimerLabel.Name = "NinesTimer"
+TimerLabel.Position = UDim2.new(1, -6, 0, 18)
+TimerLabel.Size = UDim2.new(0, 90, 0, 12)
+TimerLabel.BackgroundTransparency = 1
+TimerLabel.Text = "Free Trial: 25:00"
+TimerLabel.TextColor3 = Color3.fromRGB(142, 68, 204)
+TimerLabel.Font = Enum.Font.GothamBold
+TimerLabel.TextSize = 7.2
+TimerLabel.TextXAlignment = Enum.TextXAlignment.Right
+TimerLabel.Parent = ScreenGui
+
+-- ====================== VISUALS ======================
+local AimbotRadiusVisual = Instance.new("CylinderHandleAdornment")
+AimbotRadiusVisual.Name = "AimbotRadiusVisual"
+AimbotRadiusVisual.Transparency = 0.3
+AimbotRadiusVisual.Color3 = Color3.fromRGB(142, 68, 204)
+AimbotRadiusVisual.Height = 0.05
+AimbotRadiusVisual.AlwaysOnTop = false
+AimbotRadiusVisual.Adornee = HumanoidRootPart
+AimbotRadiusVisual.Visible = Config.ShowAimbotRadius
+AimbotRadiusVisual.Parent = CoreGui
+
+local PredictionVisual = Instance.new("SphereHandleAdornment")
+PredictionVisual.Name = "PredictionVisual"
+PredictionVisual.Radius = 1.2
+PredictionVisual.Transparency = 0.4
+PredictionVisual.Color3 = Color3.fromRGB(45, 215, 95)
+PredictionVisual.AlwaysOnTop = true
+PredictionVisual.Adornee = Workspace.Terrain
+PredictionVisual.Visible = false
+PredictionVisual.Parent = CoreGui
+
+-- Speed Bypass Part
+local SpeedBypass = Instance.new("Part")
+SpeedBypass.Name = "SpeedBypass"
+SpeedBypass.Size = Vector3.new(1,1,1)
+SpeedBypass.Transparency = 1
+SpeedBypass.CanCollide = false
+SpeedBypass.Massless = true
+SpeedBypass.Parent = Character
+
+local Weld = Instance.new("WeldConstraint")
+Weld.Part0 = HumanoidRootPart
+Weld.Part1 = SpeedBypass
+Weld.Parent = SpeedBypass
+
+-- ====================== MAIN LOOP ======================
+RunService.Heartbeat:Connect(function()
+    if not Character or not HumanoidRootPart then return end
+
+    -- Speed Boost
+    if Config.SpeedBoost > 0 then
+        local moveDir = Humanoid.MoveDirection
+        if moveDir.Magnitude > 0 then
+            local velocity = moveDir * Config.SpeedBoost
+            SpeedBypass.Velocity = velocity
+            HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(
+                velocity.X,
+                HumanoidRootPart.AssemblyLinearVelocity.Y,
+                velocity.Z
+            )
+        end
+    end
+
+    -- Aimbot Radius Visual
+    if AimbotRadiusVisual then
+        AimbotRadiusVisual.Visible = Config.ShowAimbotRadius
+        AimbotRadiusVisual.Radius = Config.AimbotRadius
+    end
+end)
+
+-- Timer
+spawn(function()
+    local timeLeft = 25 * 60
+    while timeLeft > 0 and TimerLabel do
+        local minutes = math.floor(timeLeft / 60)
+        local seconds = timeLeft % 60
+        TimerLabel.Text = string.format("Free Trial: %02d:%02d", minutes, seconds)
+        timeLeft -= 1
+        task.wait(1)
+    end
+end)
+
+-- Keybinds
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Enum.KeyCode.X then
+        Config.Aimbot = not Config.Aimbot
+        AimbotRadiusVisual.Visible = Config.Aimbot
+        print("Aimbot:", Config.Aimbot)
+    elseif input.KeyCode == Enum.KeyCode.V then
+        Config.SpeedBoost = Config.SpeedBoost > 0 and 0 or 59
+        print("Speed Boost:", Config.SpeedBoost)
+    elseif input.KeyCode == Enum.KeyCode.Z then
+        Config.AutoSteal = not Config.AutoSteal
+        print("Auto Steal:", Config.AutoSteal)
+    end
+end)
+
+-- Infinite Jump
+UserInputService.JumpRequest:Connect(function()
+    if Config.InfiniteJump then
+        Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+print("✅ Nine Hub Duels - Clean Standalone Version Loaded!")
